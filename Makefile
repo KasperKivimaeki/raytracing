@@ -1,4 +1,4 @@
-SDL = -lGL -lSDL2 -I /usr/include/SDL2/ -D_REENTRANT -L/usr/lib -pthread -lm
+SDL = -lSDL2 -I lib -lm
 
 engine: main.o sdl.o rays.o
 	gcc $(SDL) $? -o engine
