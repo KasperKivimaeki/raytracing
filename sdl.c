@@ -44,3 +44,10 @@ void LDS_initSDL() {
 
     app.texture = SDL_CreateTexture(app.renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, SCREEN_WIDTH, SCREEN_HEIGHT);
 }
+
+const int *COLOR_ARR[] = {
+    0xc5c8c6, 0x1daf21, 0x0538c6, 0x282a2e, 0x373b41,
+    0xa54242, 0xcc6666, 0x8c9440, 0xb5bd68, 0xde935f,
+    0xf0c674, 0x5f819d, 0x81a2be, 0x85678f, 0xb294bb,
+    0x5e8d87, 0x8abeb7, 0x707880, 0xc5c8c6 
+};

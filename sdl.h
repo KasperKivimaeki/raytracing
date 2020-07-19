@@ -1,5 +1,5 @@
-#ifndef SDL_H
-#define SDL_H
+#ifndef SDL_HL
+#define SDL_HL
 
 #include <SDL.h>
 
@@ -17,5 +17,9 @@ typedef struct {
 } App;
 
 App app;
+
+extern const int *COLOR_ARR[]; 
+
+#define COLOR_PICK(i) COLOR_ARR[i % 19]
 
 #endif

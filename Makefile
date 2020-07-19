@@ -1,7 +1,7 @@
-SDL = -lSDL2 -I lib -lm
+SDL = `sdl2-config --static-libs --cflags`
 
 engine: main.o sdl.o rays.o
-	gcc $(SDL) $? -o engine
+	gcc $+ -o engine $(SDL)
 
 main.o : main.c
 	gcc $(SDL) -c $^

@@ -3,7 +3,6 @@
 #include <stdlib.h>
 
 int intersects(vec3f origin, vec3f dir, vec3f v0, vec3f v1, vec3f v2) {
-
     vec3f e1, e2;
     vec3f tvec, pvec, qvec;
 
@@ -37,19 +36,19 @@ int intersects(vec3f origin, vec3f dir, vec3f v0, vec3f v1, vec3f v2) {
 
 void loadmesh(int** triangles, vec3f* vertices, int* tr) {
     double vert[7][3] = {
-        {0, 0, 0},
-        {1, 0, 0},
-        {0, 0, 1},
-        {1, 0, 1},
-        {0, 0, 0},
-        {-1, 0, 0},
-        {-0.5, 0, 0.5}
+        {0, 0, 0}, // MIDDLE
+        {1, 0, 0}, // RIGHT
+        {0, 0, 1}, // UP
+        {1, 0, 1}, // RIGHT UP
+        {0, 0, 0}, // MIDDLE
+        {-1, 0, 0}, // LEFT
+        {-0.5, 0, 0.5} // LEFT UP
     };
 
     for(int i = 0; i < 7; i++) {
-            vertices[i].x = vert[i][0];
-            vertices[i].y = vert[i][1];
-            vertices[i].z = vert[i][2];
+        vertices[i].x = vert[i][0];
+        vertices[i].y = vert[i][1];
+        vertices[i].z = vert[i][2];
     }
 
     int triang[3][3] = {

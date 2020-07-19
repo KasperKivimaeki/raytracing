@@ -6,6 +6,8 @@
 double sx1;
 double sy1;
 
+vec3f origin = {0, -4, 0};
+
 void doInput(char *click) {
     SDL_Event event;
 
@@ -20,8 +22,45 @@ void doInput(char *click) {
                 sy1 = event.button.y;
                 sx1 = event.button.x;
                 break;
+            case SDL_MOUSEWHEEL:
+                if (event.wheel.y > 0)
+                    origin.y += 0.1;
+                if (event.wheel.y < 0)
+                    origin.y -= 0.1;
+                printf("%f %f %f\n", origin.x, origin.y, origin.z);
+                break;
             default:
                 break;
+        }
+    }
+}
+
+void draw(vec3f *vertices, int **triangles, int tr, double fovx, double fovy, void *buffer) {
+    // For each pixel  (ray)
+    for(int h = 0; h < SCREEN_HEIGHT; h++) {
+        for(int w = 0; w < SCREEN_WIDTH; w++) {
+            // For each object (triangle)
+            for(int it = 0; it < tr; it++) {
+                // Copy three points of a triangle
+                vec3f v0 = vertices[triangles[it][0]];
+                vec3f v1 = vertices[triangles[it][1]];
+                vec3f v2 = vertices[triangles[it][2]];
+
+                double xr = -tan(w*1.0/SCREEN_WIDTH*fovy - fovy/2);
+                double yr = -1;
+                double zr = -tan(fovx/2 - h*1.0/SCREEN_HEIGHT*fovx);
+
+                vec3f d = {xr, yr, zr};
+
+                int intersect = intersects(origin, d, v0, v1, v2);
+
+                if(intersect) {
+                    ((int *)buffer)[w + h*SCREEN_WIDTH] = COLOR_PICK(it);
+                    break;
+                } else {
+                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x00f000 + w;
+                }
+            }
         }
     }
 }
@@ -40,51 +79,18 @@ int main(int argc, char *argv[]) {
     int frame = 0;
     char click = 0;
 
-    vec3f origin = {0, -5, 0};
-    double fov = 1.04;
-    double fov_ = 1.04*SCREEN_HEIGHT/SCREEN_WIDTH;
+    double fovy = 1.04;
+    double fovx = 1.04*SCREEN_HEIGHT/SCREEN_WIDTH;
 
-    // For each pixel  (ray)
-    for(int h = 0; h < SCREEN_HEIGHT; h++) {
-        for(int w = 0; w < SCREEN_WIDTH; w++) {
-            // For each object (triangle)
-            for(int it = 0; it < tr; it++) {
-                // Copy three points of a triangle
-                vec3f v0 = vertices[triangles[it][0]];
-                vec3f v1 = vertices[triangles[it][1]];
-                vec3f v2 = vertices[triangles[it][2]];
-
-                double xr = -tan(w*1.0/SCREEN_WIDTH*fov - fov/2);
-                double yr = -1;
-                double zr = -tan(fov_/2 - h*1.0/SCREEN_HEIGHT*fov_);
-
-                vec3f d = {xr, yr, zr};
-
-                int intersect = intersects(origin, d, v0, v1, v2);
-
-                if(intersect == 1) {
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0xff0000;
-                    break;
-                } else if(intersect) {
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x0000ff;
-                    break;
-                } else {
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x00f000 + w;
-                }
-                       
-            }
-        }
-    }
     while(1) {
         if(click) {
             // Debug
             break;
         }
+        draw(vertices, triangles, tr, fovx, fovy, buffer);
         LDS_prepareScene(frame, buffer);
         doInput(&click);
         LDS_presentScene();
-        SDL_Delay(16);
-
         frame += 1;
     }
 
