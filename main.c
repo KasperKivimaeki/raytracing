@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <omp.h>
 #include "sdl.h"
 #include "rays.h"
 
@@ -37,6 +38,7 @@ void doInput(char *click) {
 
 void draw(vec3f *vertices, int **triangles, int tr, double fovx, double fovy, void *buffer) {
     // For each pixel  (ray)
+#pragma omp parallel for
     for(int h = 0; h < SCREEN_HEIGHT; h++) {
         for(int w = 0; w < SCREEN_WIDTH; w++) {
             // For each object (triangle)

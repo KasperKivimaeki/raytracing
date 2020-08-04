@@ -3,8 +3,8 @@
 
 #include <SDL.h>
 
-#define SCREEN_WIDTH 1920
-#define SCREEN_HEIGHT 1080
+#define SCREEN_WIDTH 1920/4
+#define SCREEN_HEIGHT 1080/4
 
 void LDS_prepareScene(int, const void*);
 void LDS_presentScene();
