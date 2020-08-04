@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include "sdl.h"
 #include "rays.h"
 
@@ -87,7 +88,12 @@ int main(int argc, char *argv[]) {
             // Debug
             break;
         }
+
+	clock_t start = clock(), diff;
         draw(vertices, triangles, tr, fovx, fovy, buffer);
+	diff = clock() - start;
+	printf("%dms\n", (int)(diff * 1000 / CLOCKS_PER_SEC));
+
         LDS_prepareScene(frame, buffer);
         doInput(&click);
         LDS_presentScene();

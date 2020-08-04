@@ -1,4 +1,4 @@
-SDL = `sdl2-config --static-libs --cflags`
+SDL = `sdl2-config --static-libs --cflags` --std=c99
 
 engine: main.o sdl.o rays.o
 	gcc $+ -o engine $(SDL)
