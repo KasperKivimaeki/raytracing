@@ -141,7 +141,8 @@ int main(int argc, char *argv[]) {
     CHECK(cudaMalloc((void**)&tBuf, 3 * tr * sizeof(int)));
     CHECK(cudaMalloc((void**)&gBuf, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(int)));
     CHECK(cudaMemcpy(vBuf, vertices, 1000 * sizeof(vec3f), cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(tBuf, triangles, 3 * tr * sizeof(int), cudaMemcpyHostToDevice));
+    for (int t = 0; t < tr; t++)
+        CHECK(cudaMemcpy(tBuf + t*3, triangles[t], 3 * sizeof(int), cudaMemcpyHostToDevice));
 
     while(1) {
         if(click) {
