@@ -1,3 +1,4 @@
 *.o
 engine
 a.out
+*.swp
