@@ -1,11 +1,22 @@
-#include <stdio.h>
+#include <iostream>
 #include <math.h>
 #include <chrono>
 #include <omp.h>
 #include <SDL.h>
+#include <cuda_runtime.h>
 
 #include "sdl.hpp"
-#include "rays.h"
+#include "rays.hpp"
+
+static inline void check(cudaError_t err, const char* context) {
+    if (err != cudaSuccess) {
+        std::cerr << "CUDA error: " << context << ": "
+            << cudaGetErrorString(err) << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+}
+
+#define CHECK(x) check(x, #x)
 
 double sx1;
 double sy1;
@@ -53,7 +64,6 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
     vec3f tvec, pvec, qvec;
 
     for(int it = 0; it < tr; it++) {
-        ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x0000ff;
         // Copy three points of a triangle
         vec3f v0 = vertices[triangles[3*it + 0]];
         vec3f v1 = vertices[triangles[3*it + 1]];
@@ -72,7 +82,6 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
 
         double det = dot(pvec, e1);
 
-        /*
         if(det < epsilon && det > -epsilon) {
             intersect = 2;
         } else {
@@ -88,18 +97,17 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
                     intersect = 1;
             }
         }
-        */
 
         if(intersect) {
             ((int *)buffer)[w + h*SCREEN_WIDTH] = 0xff0000;
             it = tr;
         } else {
-            ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x00f000 + w + (int)v0.x;
+            ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x00f000 + w;
         }
     }
 }
 
-void draw(vec3f* vBuf, int* tBuf, int *gBuf, int tr, double fovx, double fovy, void *buffer) {
+void draw(vec3f* vBuf, int* tBuf, int *gBuf, int tr, double fovx, double fovy, int *buffer) {
     dim3 blocks(SCREEN_WIDTH, SCREEN_HEIGHT);
 
     printf("Hello\n");
@@ -107,8 +115,7 @@ void draw(vec3f* vBuf, int* tBuf, int *gBuf, int tr, double fovx, double fovy, v
     cudaDeviceSynchronize();
     printf("Hello\n");
 
-    cudaMemcpy(buffer, gBuf, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(int), cudaMemcpyDeviceToHost);
-
+    CHECK(cudaMemcpy(buffer, gBuf, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(int), cudaMemcpyDeviceToHost));
 }
 
 int main(int argc, char *argv[]) {
@@ -128,13 +135,13 @@ int main(int argc, char *argv[]) {
     double fovy = 1.04;
     double fovx = 1.04*SCREEN_HEIGHT/SCREEN_WIDTH;
 
-    vec3f* vBuf;
-    int *tBuf, *gBuf;
-    cudaMalloc((void**)&vBuf, 1000 * sizeof(vec3f));
-    cudaMalloc((void**)&tBuf, 3 * tr * sizeof(int));
-    cudaMalloc((void**)&gBuf, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(int));
-    cudaMemcpy(vBuf, vertices, 1000 * sizeof(vec3f), cudaMemcpyHostToDevice);
-    cudaMemcpy(tBuf, triangles, 3 * tr * sizeof(int), cudaMemcpyHostToDevice);
+    vec3f* vBuf = NULL;
+    int *tBuf = NULL, *gBuf = NULL;
+    CHECK(cudaMalloc((void**)&vBuf, 1000 * sizeof(vec3f)));
+    CHECK(cudaMalloc((void**)&tBuf, 3 * tr * sizeof(int)));
+    CHECK(cudaMalloc((void**)&gBuf, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(int)));
+    CHECK(cudaMemcpy(vBuf, vertices, 1000 * sizeof(vec3f), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(tBuf, triangles, 3 * tr * sizeof(int), cudaMemcpyHostToDevice));
 
     while(1) {
         if(click) {
@@ -162,9 +169,9 @@ int main(int argc, char *argv[]) {
     delete[] triangles;
     delete[] vertices;
 
-    cudaFree(vBuf);
-    cudaFree(tBuf);
-    cudaFree(gBuf);
+    CHECK(cudaFree(vBuf));
+    CHECK(cudaFree(tBuf));
+    CHECK(cudaFree(gBuf));
 
     return 0;
 }

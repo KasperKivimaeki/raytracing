@@ -1,4 +1,4 @@
-#include "rays.h"
+#include "rays.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 
