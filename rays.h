@@ -28,9 +28,6 @@ struct VEC3F {
 
 #define print3(s, x) printf("%s %f %f %f", s, x[0], x[1], x[2]);
 
-// Returns 0 if ray does not intersect
-int intersects(vec3f, vec3f, vec3f, vec3f, vec3f);
-
 // Triangles, vertices, amount
 void loadmesh(int**, vec3f*, int*);
 

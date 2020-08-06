@@ -1,16 +1,12 @@
-SDL = `sdl2-config --static-libs --cflags` --std=c99
+GXX=nvcc
+
+SDL = -Xcompiler "-Wall --std=c++11 -lm -ldl -lasound -lm -ldl -lpthread -lpulse-simple -lpulse -lX11 -lXext -lXcursor -lXinerama -lXi -lXrandr -lXss -lXxf86vm -lwayland-egl -lwayland-client -lwayland-cursor -lxkbcommon -lpthread -lrt -I/usr/include/SDL2 -D_REENTRANT" -lSDL2
+
+%.o: %.cu
+	$(GXX) $(SDL) -c $<
 
 engine: main.o sdl.o rays.o
-	gcc $+ -o engine $(SDL)
-
-main.o : main.c
-	gcc $(SDL) -c $^
-
-sdl.o: sdl.c
-	gcc $(SDL) -c $^
-
-rays.o: rays.c
-	gcc $(SDL) -c $^
-
+	$(GXX) $+ -o engine $(SDL)
 clean: 
 	rm -f *.o engine
+
