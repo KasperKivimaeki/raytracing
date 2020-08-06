@@ -18,6 +18,8 @@ static inline void check(cudaError_t err, const char* context) {
 
 #define CHECK(x) check(x, #x)
 
+#define EPSILON 0.000001
+
 double sx1;
 double sy1;
 
@@ -33,16 +35,16 @@ void doInput(char *click) {
                 break;
             case SDL_MOUSEBUTTONDOWN:
                 (*click)++;
-                printf("(x, y) (%d, %d)\n", event.button.x, event.button.y);
+                //printf("(x, y) (%d, %d)\n", event.button.x, event.button.y);
                 sy1 = event.button.y;
                 sx1 = event.button.x;
                 break;
             case SDL_MOUSEWHEEL:
+                //printf("%f %f %f\n", origin.x, origin.y, origin.z);
                 if (event.wheel.y > 0)
                     origin.y += 0.1;
                 if (event.wheel.y < 0)
                     origin.y -= 0.1;
-                printf("%f %f %f\n", origin.x, origin.y, origin.z);
                 break;
             default:
                 break;
@@ -51,8 +53,8 @@ void doInput(char *click) {
 }
 
 __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, double fovx, double fovy, int *buffer) {
-    int h = blockIdx.y;
-    int w = blockIdx.x;
+    int h = blockIdx.y * 8 + threadIdx.y;
+    int w = blockIdx.x * 8 + threadIdx.x;
 
     double xr = -tan(w*1.0/SCREEN_WIDTH*fovy - fovy/2);
     double yr = -1;
@@ -64,37 +66,38 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
     vec3f tvec, pvec, qvec;
 
     for(int it = 0; it < tr; it++) {
-        // Copy three points of a triangle
+        // Copy three vertices of a triangle
         vec3f v0 = vertices[triangles[3*it + 0]];
         vec3f v1 = vertices[triangles[3*it + 1]];
         vec3f v2 = vertices[triangles[3*it + 2]];
 
         int intersect = 0;
-
-        double epsilon = 0.0001;
+        double u, v, t, det, inv_det;
 
         sub(e1, v1, v0);
         sub(e2, v2, v0);
 
-        sub(tvec, origin, v0);
         cross(pvec, dir, e2);
-        cross(qvec, tvec, e1);
 
-        double det = dot(pvec, e1);
+        det = dot(pvec, e1);
 
-        if(det < epsilon && det > -epsilon) {
-            intersect = 2;
+        if(det > -EPSILON && det < EPSILON) {
+            intersect = 0;
         } else {
-            double inv_det = 1.0 / det;
-            double u = dot(pvec, tvec) * inv_det;
-            if(u < 0 || u > 1) {
+            inv_det = 1.0 / det;
+            sub(tvec, origin, v0);
+            u = dot(tvec, pvec) * inv_det;
+            if(u < 0.0 || u > 1.0) {
                 intersect = 0;
             } else {
-                double v = dot(qvec, dir) * inv_det;
-                if(v < 0 || v + u > 1)
+                cross(qvec, tvec, e1);
+                v = dot(dir, qvec) * inv_det;
+                if(v < 0.0 || u + v > 1.0)
                     intersect = 0;
-                else
-                    intersect = 1;
+                else {
+                    t = dot(e2, qvec) * inv_det;
+                    intersect = t < 0;
+                }
             }
         }
 
@@ -108,12 +111,10 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
 }
 
 void draw(vec3f* vBuf, int* tBuf, int *gBuf, int tr, double fovx, double fovy, int *buffer) {
-    dim3 blocks(SCREEN_WIDTH, SCREEN_HEIGHT);
+    dim3 blocks(SCREEN_WIDTH/8, SCREEN_HEIGHT/8);
+    dim3 threads(8, 8);
 
-    printf("Hello\n");
-    drawRay<<<blocks, 1>>>(origin, vBuf, tBuf, tr, fovx, fovy, gBuf);
-    cudaDeviceSynchronize();
-    printf("Hello\n");
+    drawRay<<<blocks, threads>>>(origin, vBuf, tBuf, tr, fovx, fovy, gBuf);
 
     CHECK(cudaMemcpy(buffer, gBuf, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(int), cudaMemcpyDeviceToHost));
 }
