@@ -19,7 +19,7 @@ void check(cudaError_t err, const char* context) {
 #define CHECK(x) check(x, #x)
 
 void loadObjFile(void *t0, void *v0, int *tn, int *vn) {
-    std::ifstream ifile("tetrahedron.obj");
+    std::ifstream ifile("obj/dodecahedron.obj");
 
     std::string nil;
 
@@ -104,9 +104,9 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
     int h = blockIdx.y * 8 + threadIdx.y;
     int w = blockIdx.x * 8 + threadIdx.x;
 
-    double xr = -tan(w*1.0/SCREEN_WIDTH*fovy - fovy/2);
+    double xr = tan(w*1.0/SCREEN_WIDTH*fovy - fovy/2);
     double yr = 1;
-    double zr = -tan(fovx/2 - h*1.0/SCREEN_HEIGHT*fovx);
+    double zr = tan(fovx/2 - h*1.0/SCREEN_HEIGHT*fovx);
 
     double s = abs(xr) + abs(yr) + abs(zr);
     xr /= s;
@@ -149,7 +149,7 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
                     intersect = 0;
                 else {
                     t = dot(e2, qvec) * inv_det;
-                    intersect = 1; 
+                    intersect = t > 0; 
                 }
             }
         }
