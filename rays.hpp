@@ -2,6 +2,7 @@
 #define RAYS_H
 
 #include <cuda_runtime.h>
+#include <vector>
 
 struct VEC3F {
     double x;
@@ -9,13 +10,19 @@ struct VEC3F {
     double z;
 };
 
+struct VEC3I {
+    int x;
+    int y;
+    int z;
+};
 
 void check(cudaError_t err, const char* context);
 #define CHECK(x) check(x, #x)
 
-#define EPSILON 0.000001
+#define EPSILON 0.0000001
 
 #define vec3f struct VEC3F
+#define vec3i struct VEC3I
 
 #define cross(dest, a, b)\
     dest.x = a.y*b.z - a.z*b.y;\
@@ -37,9 +44,8 @@ void check(cudaError_t err, const char* context);
 #define print3(s, x) printf("%s %f %f %f", s, x[0], x[1], x[2]);
 
 // Triangles, vertices, amount
-void loadmesh(void*, void*, int*);
-void loadObjFile(void* triangles, void* vertices, int* tr, int*);
+void loadObjFile(std::vector<vec3i> &triangles, std::vector<vec3f> &vertices);
 
-__global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, double fovx, double fovy, int *buffer);
+__global__ void drawRay(vec3f origin, float, vec3f *vertices, int *triangles, int tr, double fovx, double fovy, int *buffer);
 
 #endif

@@ -8,6 +8,8 @@
 #include "rays.hpp"
 #include "sdl.hpp"
 
+using std::vector;
+
 void check(cudaError_t err, const char* context) {
     if (err != cudaSuccess) {
         std::cerr << "CUDA error: " << context << ": "
@@ -18,13 +20,10 @@ void check(cudaError_t err, const char* context) {
 
 #define CHECK(x) check(x, #x)
 
-void loadObjFile(void *t0, void *v0, int *tn, int *vn) {
-    std::ifstream ifile("obj/dodecahedron.obj");
+void loadObjFile(vector<vec3i> &triangles, vector<vec3f> &vertices) {
+    std::ifstream ifile("obj/tetrahedron.obj");
 
     std::string nil;
-
-    std::vector<vec3f> vertices;
-    std::vector<int> triangles;
 
     std::string line;
     while (std::getline(ifile, line)) {
@@ -33,74 +32,25 @@ void loadObjFile(void *t0, void *v0, int *tn, int *vn) {
             case 'v':
                 vec3f vertex;
                 iss >> nil >> vertex.x >> vertex.y >> vertex.z;
-                std::cout << vertex.x << " " << vertex.y << " " << vertex.z << std::endl;
                 vertices.push_back(vertex);
+                //std::cout << vertex.x << " " << vertex.y << " " << vertex.z << std::endl;
                 break;
             case 'f':
-                int p1, p2, p3;
-                iss >> nil >> p1 >> p2 >> p3;
-                triangles.push_back(p1);
-                triangles.push_back(p2);
-                triangles.push_back(p3);
-                std::cout << p1 << " " << p2 << " " << p3 << std::endl;
+                vec3i triangle;
+                iss >> nil >> triangle.x >> triangle.y >> triangle.z;
+                triangles.push_back(triangle);
+                //std::cout << p1 << " " << p2 << " " << p3 << std::endl;
                 break;
             default:
                 break;
         }
     }
 
-    *(vec3f**)v0 = new vec3f[vertices.size()];
-    memcpy(*(vec3f**)v0, vertices.data(), vertices.size() * sizeof(vec3f));
-
-    *(int**)t0 = new int[triangles.size()];
-    memcpy(*(int**)t0, triangles.data(), triangles.size() * sizeof(int));
-
     std::cout << "v: " << vertices.size() << std::endl;
     std::cout << "t: " << triangles.size()/3 << std::endl;
-
-    *tn = triangles.size()/3;
-    *vn = vertices.size();
 }
 
-void loadmesh(void *t0, void *v0, int *tn) {
-    vec3f *vertices = new vec3f[1000];
-    int **triangles = new int*[1000];
-
-    double vert[7][3] = {
-        {0, 0, 0}, // MIDDLE
-        {1, 0, 0}, // RIGHT
-        {0, 0, 1}, // UP
-        {1, 0, 1}, // RIGHT UP
-        {0, 0, 0}, // MIDDLE
-        {-1, 0, 0}, // LEFT
-        {-0.5, 0, 0.5} // LEFT UP
-    };
-
-    for(int i = 0; i < 7; i++) {
-        vertices[i].x = vert[i][0];
-        vertices[i].y = vert[i][1];
-        vertices[i].z = vert[i][2];
-    }
-
-    int triang[3][3] = {
-        {0, 2, 1},
-        {1, 2, 3},
-        {5, 6, 4},
-    };
-
-    for(int i = 0; i < 3; i++) {
-        triangles[i] = new int[3];
-        for(int j = 0; j < 3; j++) {
-            triangles[i][j] = triang[i][j];
-        }
-    }
-
-    *tn = 3;
-    *(int***)t0 = triangles;
-    *(vec3f**)v0 = vertices;
-}
-
-__global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, double fovx, double fovy, int *buffer) {
+__global__ void drawRay(vec3f origin, float ang, vec3f *vertices, int *triangles, int tr, double fovx, double fovy, int *buffer) {
     int h = blockIdx.y * 8 + threadIdx.y;
     int w = blockIdx.x * 8 + threadIdx.x;
 
@@ -113,10 +63,14 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
     yr /= s;
     zr /= s;
 
+    xr += cos(ang);
+
     vec3f dir = {xr, yr, zr};
 
     vec3f e1, e2;
     vec3f tvec, pvec, qvec;
+
+    float mt = 0;
 
     for(int it = 0; it < tr; it++) {
         // Copy three vertices of a triangle
@@ -154,22 +108,27 @@ __global__ void drawRay(vec3f origin, vec3f *vertices, int *triangles, int tr, d
             }
         }
 
-        if (intersect) {
+        if (intersect && t > mt) {
+            mt = t;
+
+            int a = (int)(mt*mt);
+            int s = 0xff;
+            ((int *)buffer)[w + h*SCREEN_WIDTH] = (a << 16) + (a << 8) + a;
+
             switch(it) {
                 case 0:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0xff0000;
+                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= s << 16;
                     break;
                 case 1:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x00ff00;
+                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= s << 8;
                     break;
                 case 2:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x0000ff;
+                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= s;
                     break;
                 case 3:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] = 0x00ffff;
+                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= (s << 8) + s;
                     break;
             }
-            return;
         }
     }
 }

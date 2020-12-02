@@ -9,12 +9,10 @@
 
 class App {
 public:
-    App() {
-    }
+    App();
 
     void LDS_prepareScene(int, const void*);
     void LDS_presentScene();
-    void LDS_initSDL();
 
 private:
     SDL_Renderer *renderer;

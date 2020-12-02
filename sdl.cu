@@ -15,7 +15,7 @@ void App::LDS_presentScene() {
 }
 
 // Nice init function by parallelrealities.co.uk
-void App::LDS_initSDL() {
+App::App() {
     int rendererFlags, windowFlags;
 
     rendererFlags = SDL_RENDERER_ACCELERATED;

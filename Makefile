@@ -5,7 +5,7 @@ SDL = -Xcompiler "-Wall --std=c++11 -lm -ldl -lasound -lm -ldl -lpthread -lpulse
 %.o: %.cu
 	$(GXX) $(SDL) -c $<
 
-engine: main.o sdl.o rays.o
+engine: main.o sdl.o rays.o tracer.o
 	$(GXX) $+ -o engine $(SDL)
 clean: 
 	rm -f *.o engine
