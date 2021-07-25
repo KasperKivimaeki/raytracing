@@ -9,29 +9,33 @@ Tracer::Tracer(App *app) {
 
     vertices = std::vector<vec3f>();
     triangles = std::vector<vec3i>();
+    normals = std::vector<vec3f>();
 
     this->frame = 0;
 
     this->app = app;
 
     // TODO: Fix to support window resizing
-    this->fovy = 1.04;
-    this->fovx = 1.04*SCREEN_HEIGHT/SCREEN_WIDTH;
+    this->fovy = PI/2;
+    this->fovx = PI/2;
 
-    loadObjFile(triangles, vertices);
+    loadObjFile(triangles, vertices, normals);
 
-    this->ang = 0;
+    this->ang = 45;
 
-    this->origin = {0, -10, 0};
+    this->origin = {0, -200, -200};
     this->click = 0;
 
     vBuf = NULL;
+    nBuf = NULL;
     tBuf = NULL;
     gBuf = NULL;
 
     CHECK(cudaMalloc((void**)&vBuf, vertices.size() * sizeof(vec3f)));
+    CHECK(cudaMalloc((void**)&nBuf, normals.size() * sizeof(vec3f)));
     CHECK(cudaMalloc((void**)&tBuf, 3 * triangles.size() * sizeof(int)));
     CHECK(cudaMalloc((void**)&gBuf, SCREEN_HEIGHT * SCREEN_WIDTH * sizeof(int)));
+    CHECK(cudaMemcpy(nBuf, normals.data(), normals.size() * sizeof(vec3f), cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(vBuf, vertices.data(), vertices.size() * sizeof(vec3f), cudaMemcpyHostToDevice));
     CHECK(cudaMemcpy(tBuf, triangles.data(), 3 * triangles.size() * sizeof(int), cudaMemcpyHostToDevice));
 }
@@ -39,6 +43,7 @@ Tracer::Tracer(App *app) {
 Tracer::~Tracer() {
     delete[] buffer;
 
+    CHECK(cudaFree(nBuf));
     CHECK(cudaFree(vBuf));
     CHECK(cudaFree(tBuf));
     CHECK(cudaFree(gBuf));
@@ -50,7 +55,8 @@ void Tracer::draw() const {
 
     CHECK(cudaMemset(gBuf, 0, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(int)));
 
-    drawRay<<<blocks, threads>>>(origin, PI*ang/180, vBuf, tBuf, triangles.size(), fovx, fovy, gBuf);
+    drawRay<<<blocks, threads>>>(origin, ang*PI/180, vBuf, nBuf, triangles.size(), tBuf, triangles.size(), fovx, fovy, gBuf);
+    cudaDeviceSynchronize();
 
     CHECK(cudaMemcpy(buffer, gBuf, SCREEN_WIDTH * SCREEN_HEIGHT * sizeof(int), cudaMemcpyDeviceToHost));
 }
@@ -82,12 +88,10 @@ void Tracer::getInput() {
                 exit(0);
                 break;
             case SDL_MOUSEBUTTONDOWN:
-                //printf("(x, y) (%d, %d)\n", event.button.x, event.button.y);
                 sy1 = event.button.y;
                 sx1 = event.button.x;
                 break;
             case SDL_MOUSEWHEEL:
-                //printf("%f %f %f\n", origin.x, origin.y, origin.z);
                 if (event.wheel.y > 0)
                     origin.y += 0.1;
                 if (event.wheel.y < 0)
@@ -95,25 +99,24 @@ void Tracer::getInput() {
                 break;
             case SDL_KEYDOWN:
                 switch(event.key.keysym.sym) {
+                    case SDLK_ESCAPE:
+                        exit(0);
+                        break;
                     case 'a':
                     case SDLK_LEFT:
-                        origin.x -= 1.0*cos(ang*PI/180);
-                        origin.z -= 1.0*sin(ang*PI/180);
+                        origin.x -= 1.0;
                         break;
                     case 'd':
                     case SDLK_RIGHT:
-                        origin.x += 1.0*cos(ang*PI/180);
-                        origin.z += 1.0*sin(ang*PI/180);
+                        origin.x += 1.0;
                         break;
                     case 'w':
                     case SDLK_UP:
-                        origin.z += 1.0*cos(ang*PI/180);
-                        origin.x += 1.0*sin(ang*PI/180);
+                        origin.z += 1.0;
                         break;
                     case 's':
                     case SDLK_DOWN:
-                        origin.z -= 1.0*cos(ang*PI/180);
-                        origin.x -= 1.0*sin(ang*PI/180);
+                        origin.z -= 1.0;
                         break;
                     case 'q':
                         ang += 5;

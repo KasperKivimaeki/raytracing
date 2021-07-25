@@ -4,11 +4,38 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <assert.h>
 
 #include "rays.hpp"
 #include "sdl.hpp"
 
+#define IFDEBUG(...)
+
 using std::vector;
+
+__device__ mat3f rotation3d(float ang, int l, int m, int n) {
+    mat3f mat;
+    mat.a0 = l*l*(1 - cos(ang)) + cos(ang);
+    mat.b0 = m*l*(1 - cos(ang)) - sin(ang) * n;
+    mat.c0 = n*l*(1 - cos(ang)) + sin(ang) * m;
+    mat.a1 = l*m*(1 - cos(ang)) + sin(ang) * n;
+    mat.b1 = m*m*(1 - cos(ang)) + cos(ang);
+    mat.c1 = n*m*(1 - cos(ang)) - sin(ang) * l;
+    mat.a2 = l*n*(1 - cos(ang)) - sin(ang) * m;
+    mat.b2 = m*n*(1 - cos(ang)) + sin(ang) * l;
+    mat.c2 = n*n*(1 - cos(ang)) + cos(ang);
+    return mat;
+}
+
+__device__ vec3f multvec3f(vec3f v, mat3f m) {
+    vec3f r;
+
+    r.x = v.x * m.a0 + v.y * m.b0 + v.z * m.c0;
+    r.y = v.x * m.a1 + v.y * m.b1 + v.z * m.c1;
+    r.z = v.x * m.a2 + v.y * m.b2 + v.z * m.c2;
+
+    return r;
+}
 
 void check(cudaError_t err, const char* context) {
     if (err != cudaSuccess) {
@@ -20,8 +47,8 @@ void check(cudaError_t err, const char* context) {
 
 #define CHECK(x) check(x, #x)
 
-void loadObjFile(vector<vec3i> &triangles, vector<vec3f> &vertices) {
-    std::ifstream ifile("obj/tetrahedron.obj");
+void loadObjFile(vector<vec3i> &triangles, vector<vec3f> &vertices, vector<vec3f> &normals) {
+    std::ifstream ifile("obj/teapot.obj");
 
     std::string nil;
 
@@ -33,13 +60,16 @@ void loadObjFile(vector<vec3i> &triangles, vector<vec3f> &vertices) {
                 vec3f vertex;
                 iss >> nil >> vertex.x >> vertex.y >> vertex.z;
                 vertices.push_back(vertex);
-                //std::cout << vertex.x << " " << vertex.y << " " << vertex.z << std::endl;
                 break;
             case 'f':
                 vec3i triangle;
                 iss >> nil >> triangle.x >> triangle.y >> triangle.z;
                 triangles.push_back(triangle);
-                //std::cout << p1 << " " << p2 << " " << p3 << std::endl;
+                break;
+            case 'n':
+                vec3f normal;
+                iss >> nil >> normal.x >> normal.y >> normal.z;
+                normals.push_back(normal);
                 break;
             default:
                 break;
@@ -47,25 +77,27 @@ void loadObjFile(vector<vec3i> &triangles, vector<vec3f> &vertices) {
     }
 
     std::cout << "v: " << vertices.size() << std::endl;
+    std::cout << "n: " << normals.size() << std::endl;
     std::cout << "t: " << triangles.size()/3 << std::endl;
 }
 
-__global__ void drawRay(vec3f origin, float ang, vec3f *vertices, int *triangles, int tr, double fovx, double fovy, int *buffer) {
+__global__ void drawRay(vec3f camera, float ang, const vec3f *vertices, const vec3f *normals, int vn, const int *triangles, int tr, double fovx, double fovy, int *buffer) {
     int h = blockIdx.y * 8 + threadIdx.y;
     int w = blockIdx.x * 8 + threadIdx.x;
 
-    double xr = tan(w*1.0/SCREEN_WIDTH*fovy - fovy/2);
-    double yr = 1;
-    double zr = tan(fovx/2 - h*1.0/SCREEN_HEIGHT*fovx);
+    // POINT IN IMAGE PLANE
+    vec3f p;
+    p.x = w*2.0f/SCREEN_WIDTH - 1.f;
+    p.y = 1.0f/(tan(fovx/2));
+    p.z = h*2.0f/SCREEN_HEIGHT - 1.f;
 
-    double s = abs(xr) + abs(yr) + abs(zr);
-    xr /= s;
-    yr /= s;
-    zr /= s;
+    mat3f camRot = rotation3d(ang, 1, 0, 0); // l=0, m=0, n=1
 
-    xr += cos(ang);
+    IFDEBUG(abs(p.x) < 1.0f || h || w);
+    IFDEBUG(abs(p.z) < 1.0f || h || w);
 
-    vec3f dir = {xr, yr, zr};
+    // A RAY
+    vec3f ray = multvec3f(p, camRot);
 
     vec3f e1, e2;
     vec3f tvec, pvec, qvec;
@@ -73,10 +105,20 @@ __global__ void drawRay(vec3f origin, float ang, vec3f *vertices, int *triangles
     float mt = 0;
 
     for(int it = 0; it < tr; it++) {
+        assert(3*it + 2 < tr*3);
+
+        int t0 = triangles[3*it + 0];
+        int t1 = triangles[3*it + 1];
+        int t2 = triangles[3*it + 2];
+
+        IFDEBUG(t0 < vn);
+        IFDEBUG(t1 < vn);
+        IFDEBUG(t2 < vn);
+
         // Copy three vertices of a triangle
-        vec3f v0 = vertices[triangles[3*it + 0]];
-        vec3f v1 = vertices[triangles[3*it + 1]];
-        vec3f v2 = vertices[triangles[3*it + 2]];
+        vec3f v0 = vertices[t0];
+        vec3f v1 = vertices[t1];
+        vec3f v2 = vertices[t2];
 
         int intersect = 0;
         double u, v, t, det, inv_det;
@@ -84,7 +126,7 @@ __global__ void drawRay(vec3f origin, float ang, vec3f *vertices, int *triangles
         sub(e1, v1, v0);
         sub(e2, v2, v0);
 
-        cross(pvec, dir, e2);
+        cross(pvec, ray, e2);
 
         det = dot(pvec, e1);
 
@@ -92,13 +134,13 @@ __global__ void drawRay(vec3f origin, float ang, vec3f *vertices, int *triangles
             intersect = 0;
         } else {
             inv_det = 1.0 / det;
-            sub(tvec, origin, v0);
+            sub(tvec, camera, v0);
             u = dot(tvec, pvec) * inv_det;
             if(u < 0.0 || u > 1.0) {
                 intersect = 0;
             } else {
                 cross(qvec, tvec, e1);
-                v = dot(dir, qvec) * inv_det;
+                v = dot(ray, qvec) * inv_det;
                 if(v < 0.0 || u + v > 1.0)
                     intersect = 0;
                 else {
@@ -109,26 +151,14 @@ __global__ void drawRay(vec3f origin, float ang, vec3f *vertices, int *triangles
         }
 
         if (intersect && t > mt) {
+            vec3f vn = normals[t0];
+
+            float mul = dot(vn, ray) / 3.0f;
+            int col = (int)(255.0 * mul) & 0xff;
+
             mt = t;
 
-            int a = (int)(mt*mt);
-            int s = 0xff;
-            ((int *)buffer)[w + h*SCREEN_WIDTH] = (a << 16) + (a << 8) + a;
-
-            switch(it) {
-                case 0:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= s << 16;
-                    break;
-                case 1:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= s << 8;
-                    break;
-                case 2:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= s;
-                    break;
-                case 3:
-                    ((int *)buffer)[w + h*SCREEN_WIDTH] |= (s << 8) + s;
-                    break;
-            }
+            buffer[w + h*SCREEN_WIDTH] = col | (col << 8) | (col << 16); 
         }
     }
 }

@@ -27,12 +27,13 @@ private:
     int click;
 
     std::vector<vec3f> vertices;
+    std::vector<vec3f> normals;
     std::vector<vec3i> triangles;
 
     int* buffer;
 
     int *gBuf, *tBuf;
-    vec3f *vBuf;
+    vec3f *vBuf, *nBuf;
 
     float fovx;
     float fovy;
